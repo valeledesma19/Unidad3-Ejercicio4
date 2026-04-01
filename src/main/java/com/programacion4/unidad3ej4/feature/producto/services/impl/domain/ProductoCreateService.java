@@ -1,5 +1,9 @@
 package com.programacion4.unidad3ej4.feature.producto.services.impl.domain;
 
+import com.programacion4.unidad3ej4.config.exceptions.ConflictException;
+import com.programacion4.unidad3ej4.config.exceptions.NotFoundException;
+import com.programacion4.unidad3ej4.feature.producto.models.Categoria;
+import com.programacion4.unidad3ej4.feature.producto.repositories.ICategoriaRepository;
 import org.springframework.stereotype.Service;
 
 import com.programacion4.unidad3ej4.config.exceptions.BadRequestException;
@@ -13,6 +17,8 @@ import com.programacion4.unidad3ej4.feature.producto.services.interfaces.domain.
 
 import lombok.AllArgsConstructor;
 
+import static org.apache.tomcat.util.IntrospectionUtils.capitalize;
+
 
 @Service
 @AllArgsConstructor
@@ -21,18 +27,34 @@ public class ProductoCreateService implements IProductoCreateService {
     private final IProductoExistByNameService productoExistByNameService;
 
     private final IProductoRepository productoRepository;
+    private final ICategoriaRepository categoriaRepository;
 
     @Override
     public ProductoResponseDto create(ProductoCreateRequestDto dto) {
 
         if (productoExistByNameService.existByName(dto.getNombre())) {
-            throw new BadRequestException("El nombre del producto ya existe");
+            throw new ConflictException("El nombre del producto ya existe");
         }
 
-        Producto productoAGuardar = ProductoMapper.toEntity(dto, null);
-        
-        Producto productoGuardado = productoRepository.save(productoAGuardar);
 
-        return ProductoMapper.toResponseDto(productoGuardado);
+        Categoria categoria = categoriaRepository.findById(dto.getCategoriaId())
+                .orElseThrow(() -> new NotFoundException("Categoría no encontrada"));
+
+        dto.setNombre(capitalize(dto.getNombre()));
+        dto.setDescripcion(capitalize(dto.getDescripcion()));
+
+        Producto producto = ProductoMapper.toEntity(dto, categoria);
+
+        producto.setEstaEliminado(false);
+
+        Producto guardado = productoRepository.save(producto);
+
+        return ProductoMapper.toResponseDto(guardado);
+    }
+    private String capitalize(String texto) {
+        if (texto == null || texto.isEmpty()) return texto;
+
+        texto = texto.toLowerCase();
+        return texto.substring(0, 1).toUpperCase() + texto.substring(1);
     }
 }
